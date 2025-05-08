@@ -21,6 +21,35 @@ float distSphere(vec3 p, float r){
     return length(p) - r;
 }
 
+vec3 twist(vec3 p, float power){
+    float s = sin(power * p.z);
+    float c = cos(power * p.z);
+    mat3 m = mat3(
+          c,   s, 0.0,
+         -s,   c, 0.0,
+        0.0, 0.0, 1.0
+    );
+    return m * p;
+}
+
+vec3 modRotate(vec3 p, float interval) {
+    // 各セルのインデックスを求める
+    vec3 cell = floor(p / interval);
+
+    // 擬似乱数生成（cell位置から）
+    float rnd = fract(sin(dot(cell.xy ,vec2(12.9898,78.233))) * 43758.5453);
+    float angle = rnd * pi2;
+
+    // 回転（Y軸回りに回転する例）
+    mat2 rotMat = rot(angle);
+    p.xz = rotMat * p.xz;
+
+    // 繰り返し
+    p = mod(p, interval) - interval * 0.5;
+
+    return p;
+}
+
 float sdTorus( vec3 p, vec2 t )
 {
     vec2 q = vec2(length(p.xy)-t.x,p.z);
@@ -71,7 +100,10 @@ float doubleKo(vec3 p) {
 float distFunc(vec3 p){
     // return doubleKo(p);
     float a = 1.5;
-    p = mod(p, a) - a / 2.;
+    p = twist(p, sin(time * .3) * .15);
+    p.z += time * .1;
+    // p = mod(p, a) - a / 2.;
+    p = modRotate(p, a);
     return min(doubleKo(p), sdLink(p, .4, .1, .01));
 }
 
@@ -101,19 +133,23 @@ void main(void){
     vec3 rPos = ro;
     int step = 0;
 
+    float mainEmissive = 0.0;
+
     for(int i = 0; i < 100; i++) {
         step++;
         dist = distFunc(rPos);
         rLen += dist;
         rPos = ro + rd * rLen;
 
+        mainEmissive += exp(abs(dist)*-.2);
         if (abs(dist) < EPS) {
             break;
         }
     }
 
     vec3 color;
-    color = vec3(exp(-.4 * rLen));
+    // color = vec3(exp(-.4 * rLen));
+    color = 0.03 * mainEmissive * vec3(1.0, 0.2941, 0.9529);
     
     gl_FragColor = vec4(color, 1.0);
 
