@@ -11,49 +11,20 @@ const float fov = angle * 0.5 * pi / 180.0;
 const float sphereSize = 1.0;
 vec3 lightDir = vec3(-0.577, 0.577, 0.577);
 
-#define C_HASH 2309480282U
-
-float hash12( vec2 p )
-{
-    uvec2 x = floatBitsToUint(p);
-    x = C_HASH * ((x>>8U)^x.yx);
-    x = C_HASH * ((x>>8U)^x.yx);
-    x = C_HASH * ((x>>8U)^x.yx);
-    
-    return float(x.x)*(1.0/float(0xffffffffU));
-}
-
 float sdBox( vec3 p, vec3 b )
 {
   vec3 q = abs(p) - b;
   return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 }
 
-// https://kinakomoti321.hatenablog.com/entry/2024/12/10/023309
-vec2 gridCenter;
-float gridTraversal(vec2 ro, vec2 rd) {
-    gridCenter = floor((ro + rd * 1E-3)) + .5;
-
-    vec2 src = -(ro - gridCenter) / rd;
-    vec2 dst = abs(.5/rd);
-    vec2 bv = src + dst;
-
-    return min(bv.x, bv.y);
-}
-
 float distFunc(vec3 p){
-    p.xz -= gridCenter;
-    
-    float offset = hash12(gridCenter);
-
-    float d = sdBox( p + vec3(0., offset, 0.), vec3(0.5, 2., .5));
-    return d;
+    return sdBox(p + vec3(0., 0., 0.), vec3(1., 2., 1.));
 }
 
 void main(void){
     vec2 p = (gl_FragCoord.xy * 2. - resolution) / min(resolution.x, resolution.y);
     
-    vec3 ro = vec3(0., 3., -3. + time); // ray origin
+    vec3 ro = vec3(0., 0., -3.); // ray origin
     vec3 ta = vec3(0., 0., 0.); // target
     vec3 fwd = normalize(ta - ro); // forward direction
     vec3 up = vec3(0., 1., 0.); // up direction
@@ -72,13 +43,11 @@ void main(void){
     vec3 color;
     for(int i = 0; i < 100; i++) {
         step++;
-        float limitD = gridTraversal(rPos.xz, rd.xz);
         dist = distFunc(rPos);
 
         if (abs(dist) < EPS) {
             break;
         }
-        dist = min(dist, limitD);
         rLen += dist;
         rPos += rd * dist;
 
