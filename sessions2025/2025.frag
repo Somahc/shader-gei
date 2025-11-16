@@ -42,6 +42,12 @@ QTR qt(vec3 ro, vec3 rd) {
     r.size /= 2.;
     r.cell = lofi(ro + rd*1E-2*r.size.x, r.size) + r.size/2.;
     r.hole = r.cell.y > 0.;
+    // r.hole = abs(r.cell.y) < 100.;
+    // r.hole = abs(r.cell.x) < 100.;
+    // r.hole = abs(r.cell.z) < 100.;
+
+    // r.hole = abs(r.cell.y) < 100. && abs(r.cell.x) < 100. && abs(r.cell.z) < 100.;
+
     if(r.hole) break;
     float di = fs(dot(r.cell, vec3(3,4,5)));
     if(di>.5) break;
@@ -60,7 +66,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 p = uv * 2. - 1.;
   p.x *= iResolution.x / iResolution.y;
 
-  vec3 ro = vec3(0., 5., 5.);
+  vec3 ro = vec3(0, 3., 5.);
   vec3 ta = vec3(0., -1., -1.);
   vec3 rd = orthbas(ro - ta) * normalize(vec3(p, -2.));
 
@@ -75,7 +81,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec3 off = vec3(0);
     if(!qtr.hole) {
       vec3 size = qtr.size / 2. - 0.01;
-      isect = isectBox(ro-qtr.cell, rd, size);
+
+      // 各セルをランダムに動かすところ(0b5vr san)
+      // float di = fs(dot(qtr.cell, vec3(2,6,6)));
+      // float ph = iTime + dot(qtr.cell, vec3(1)) + 3. * di;
+      // off.y -= 0.5 + 0.5 * sin(ph);
+
+      isect = isectBox(ro-qtr.cell-off, rd, size);
     }
 
     if(isect.w<1E2) {
@@ -83,7 +95,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
       ro += rd*isect.w;
 
       color = vec4(n, 1.);
-      rd = reflect(rd, n);
+      break;
+      // rd = reflect(rd, n);
     } else {
       ro += rd * qtr.len;
     }
