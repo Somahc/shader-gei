@@ -53,23 +53,21 @@ struct RayHitInfo {
 // ジオメトリを定義
 float map(vec3 pos) {
     float d = 1e9;
-    
-    
 
     const int FAN_NUM = 6;
 
+    vec3 q = pos;
     for (int i=0; i<FAN_NUM; i++) {
       float a = TAU * float(i) / float(FAN_NUM);
 
-      vec3 q = pos;
-      q.xy = rot(a) * q.xy;
+    //   q.xy = rot(a) * q.xy;
 
-      float fin = sdBox(q - vec3(0), vec3(0.2,0.65,0.1), 0.05);
+      float fin = sdBox(q - vec3(0.,0., 0), vec3(0.2,0.65,0.1), 0.05);
+      fin = sdSphere(q - vec3(0., -1., 0.), .3);
       d = min(d, fin);
+      q.xy *= rot(1.);
     }
 
-
-    
     //return roomD;
     return d;
 }
@@ -123,7 +121,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec3 ro = vec3(-1,-1.3,-4.);
     // fanにちかづく
-    ro = vec3(-1,-1.3,-1.5);
+    ro = vec3(0.,0.,-2.);
 
     // ro = vec3(-10, -1.3, -20.);
     vec3 ta = vec3(-2, -5, 0);
