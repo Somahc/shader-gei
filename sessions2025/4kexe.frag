@@ -28,11 +28,16 @@ float sdBox( vec3 p, vec3 b, float r )
     return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
 }
 
-// float sdRoundBox( vec3 p, vec3 b, float r )
-// {
-//   vec3 q = abs(p) - b + r;
-//   return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
-// }
+float sdUnevenCapsule( vec2 p, float r1, float r2, float h )
+{
+    p.x = abs(p.x);
+    float b = (r1-r2)/h;
+    float a = sqrt(1.0-b*b);
+    float k = dot(p,vec2(-b,a));
+    if( k < 0.0 ) return length(p) - r1;
+    if( k > a*h ) return length(p-vec2(0.0,h)) - r2;
+    return dot(p, vec2(a,b) ) - r1;
+}
 
 float sdCappedCylinder( vec3 p, float r, float h )
 {
@@ -76,11 +81,18 @@ float map(vec3 pos) {
     d = min(d, fanCenter);
 
     vec3 q = pos;
-    const int OBJ_NUM = 8;
+    const int OBJ_NUM = 7;
 
     q -= vec3(0., 0., .7); // ファンの位置
     q.xy = pmod(q.xy, float(OBJ_NUM));
-    d = min(d, sdBox(q - vec3(0, 1., 0), vec3(0.23,0.7,0.1), 0.05));
+    q.xz *= rot(.1 * TAU);
+
+    q.xy *= rot(-0.06); // bladeに法線Artifact出ないよう微回転
+    // 2Dで形作ってextrude
+    float blade2D = sdUnevenCapsule(q.xy, .03, .4, 1.4);
+    vec2 w = vec2(blade2D, abs(q.z) - 0.1);
+    float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
+    d = min(d, blade);
 
 
 

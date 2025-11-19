@@ -28,6 +28,18 @@ float sdBox( vec3 p, vec3 b, float r )
     return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
 }
 
+// iq: 3D SDFs
+float sdUnevenCapsule( vec2 p, float r1, float r2, float h )
+{
+    p.x = abs(p.x);
+    float b = (r1-r2)/h;
+    float a = sqrt(1.0-b*b);
+    float k = dot(p,vec2(-b,a));
+    if( k < 0.0 ) return length(p) - r1;
+    if( k > a*h ) return length(p-vec2(0.0,h)) - r2;
+    return dot(p, vec2(a,b) ) - r1;
+}
+
 // float sdRoundBox( vec3 p, vec3 b, float r )
 // {
 //   vec3 q = abs(p) - b + r;
@@ -73,7 +85,10 @@ float map(vec3 pos) {
 
     // q.xz *= rot(iTime);
     q.xy = pmod(q.xy, float(OBJ_NUM));
-    d = min(d, sdBox(q - vec3(0, 0.8, 0), vec3(0.2,0.65,0.1), 0.05));
+    float blade2D = sdUnevenCapsule(q.xy, .01, .2, .7);
+    vec2 w = vec2(blade2D, abs(q.z) - 0.1);
+    float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
+    d = min(d, blade);
 
     //return roomD;
     return d;
@@ -128,7 +143,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec3 ro = vec3(-1,-1.3,-4.);
     // fanにちかづく
-    ro = vec3(0.,0.,-2.);
+    ro = vec3(0.,2.,-2.);
 
     // ro = vec3(-10, -1.3, -20.);
     vec3 ta = vec3(-2, -5, 0);
