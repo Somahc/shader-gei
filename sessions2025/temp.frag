@@ -10,7 +10,7 @@ mat3 orthBas(vec3 z){
 
 mat2 rot(float a) {
     float c = cos(a), s = sin(a);
-    return mat2(c, -s, s, a);
+    return mat2(c, s, -s, c);
 }
 
 vec2 pmod(vec2 p, float r) {
@@ -54,19 +54,26 @@ struct RayHitInfo {
 float map(vec3 pos) {
     float d = 1e9;
 
-    const int FAN_NUM = 6;
-
     vec3 q = pos;
-    for (int i=0; i<FAN_NUM; i++) {
-      float a = TAU * float(i) / float(FAN_NUM);
+    // float fin = sdBox(q - vec3(0.,0., 0), vec3(0.2,0.65,0.1), 0.05);
 
-    //   q.xy = rot(a) * q.xy;
+    const int OBJ_NUM = 8;
 
-      float fin = sdBox(q - vec3(0.,0., 0), vec3(0.2,0.65,0.1), 0.05);
-      fin = sdSphere(q - vec3(0., -1., 0.), .3);
-      d = min(d, fin);
-      q.xy *= rot(1.);
-    }
+    // for(int i=0;i<OBJ_NUM;i++) {
+    //     float a = TAU * float(i) / float(OBJ_NUM);
+
+    //     float fi = float(i);
+    //     float theta = fi * TAU / float(OBJ_NUM);
+    //     vec3 o = vec3(cos(theta), sin(theta), 0.);
+    //     float r = 0.2;
+    //     float blade = sdBox(q - o, vec3(0.2,0.65,0.1), 0.05);
+    //     d = min(d, blade);
+    //     // q.xy *= rot(iTime * .1);
+    // }
+
+    // q.xz *= rot(iTime);
+    q.xy = pmod(q.xy, float(OBJ_NUM));
+    d = min(d, sdBox(q - vec3(0, 0.8, 0), vec3(0.2,0.65,0.1), 0.05));
 
     //return roomD;
     return d;
@@ -125,7 +132,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     // ro = vec3(-10, -1.3, -20.);
     vec3 ta = vec3(-2, -5, 0);
-    ta = vec3(0);
+    ta = vec3(0., 0., 0.);
     vec3 fwd = normalize(ta - ro);
     vec3 up = vec3(0, 1, 0);
     vec3 side = normalize(cross(fwd, up));
