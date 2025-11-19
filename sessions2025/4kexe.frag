@@ -10,7 +10,7 @@ mat3 orthBas(vec3 z){
 
 mat2 rot(float a) {
     float c = cos(a), s = sin(a);
-    return mat2(c, s, -s, a);
+    return mat2(c, s, -s, c);
 }
 
 vec2 pmod(vec2 p, float r) {
@@ -72,14 +72,16 @@ float map(vec3 pos) {
     d = min(d, floorD);
 
     // ファン
-    float fanCenter = sdCappedCylinder(pos - vec3(0,0,.8), 0.4, .3);
+    float fanCenter = sdCappedCylinder(pos - vec3(0,0,.8), 0.35, .3);
     d = min(d, fanCenter);
 
-    vec3 pmodPos = pos;
-    pmodPos.xy = pmod(pmodPos.xy, 6.);
-    float fanFins = sdBox(pmodPos - vec3(0,-1,.8), vec3(0.2,0.65,0.1), 0.05);
-    // d = min(d, fanFins);
-    d = fanFins;
+    vec3 q = pos;
+    const int OBJ_NUM = 8;
+
+    q -= vec3(0., 0., .7); // ファンの位置
+    q.xy = pmod(q.xy, float(OBJ_NUM));
+    d = min(d, sdBox(q - vec3(0, 1., 0), vec3(0.23,0.7,0.1), 0.05));
+
 
 
     
@@ -138,7 +140,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // fanにちかづく
     // ro = vec3(-1,-1.3,-1.5);
 
-    ro = vec3(-1, -1.3, -10.);
+    // ro = vec3(-.0,-0.,-2.5);
     vec3 ta = vec3(-2, -5, 0);
     ta = vec3(0);
     vec3 fwd = normalize(ta - ro);
