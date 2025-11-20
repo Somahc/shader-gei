@@ -55,15 +55,21 @@ struct RayHitInfo {
     vec3 diffuse;
 };
 
+// 最も近いSDFの情報を入れる　マテリアル識別用
+struct SDFInfo {
+    int index;
+};
+
 // ジオメトリを定義
-float map(vec3 pos) {
+float map(vec3 pos, inout SDFInfo info) {
     float d;
+    info.index = 0;
     
     float tubeOuter = sdCappedCylinder(pos + vec3(0,0,1), 1.8, 4.5);
     
     float tubeWall = sdBox(pos - vec3(0,0,0), vec3(5, 5, 5.), 0.);
     
-    float roomFrontInner = sdBox(pos - vec3(0,0,-2.), vec3(3.5,2.,1.9), 0.);
+    float roomFrontInner = sdBox(pos - vec3(0,0,-2.), vec3(3.5,4.,1.9), 0.);
     
     // Z軸に長い立体から、奥行き1.5の円柱をくりぬく
     d = max(-tubeOuter, tubeWall);
@@ -73,6 +79,8 @@ float map(vec3 pos) {
 
     // 床面を合成
     float floorD = sdBox(pos - vec3(0,-2.3,-2.), vec3(5., .6, 6.), 0.);
+
+    info.index = (floorD < d) ? 1 : info.index;
 
     d = min(d, floorD);
 
@@ -103,10 +111,11 @@ float map(vec3 pos) {
 
 vec3 getNormal(vec3 pos) {
         vec3 EPS = vec3(0.001, 0., 0.);
+        SDFInfo dummy;
         return normalize(vec3(
-            map(pos + EPS.xyy) - map(pos - EPS.xyy),
-            map(pos + EPS.yxy) - map(pos - EPS.yxy),
-            map(pos + EPS.yyx) - map(pos - EPS.yyx)
+            map(pos + EPS.xyy, dummy) - map(pos - EPS.xyy, dummy),
+            map(pos + EPS.yxy, dummy) - map(pos - EPS.yxy, dummy),
+            map(pos + EPS.yyx, dummy) - map(pos - EPS.yyx, dummy)
         ));
 }
 
@@ -116,6 +125,9 @@ struct SurfaceInfo {
     vec3 position;
 };
 
+#define NUM_MAT 2
+const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(0.0, 0.2, 0.0));
+
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
     float dist;
@@ -123,14 +135,17 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
     
     info.color = vec3(0.);
     info.normal = vec3(0.);
+
+    SDFInfo sdf_info;
     
     for(int i=0; i<MAX_STEP; i++) {
         vec3 rPos = ro + rd * sumDist;
-        dist = map(rPos);
+        dist = map(rPos, sdf_info);
         
         if (dist < 0.001){
             info.position = rPos;
-            info.color = vec3(1.);
+            // info.color = vec3(1.);
+            info.color = color[sdf_info.index];
             info.normal = getNormal(info.position);
             return true;
         }
@@ -139,7 +154,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
     return false;
 }
 
-
+#define LIGHT_DIR normalize(vec3(0.5, 1.0, 0.0))
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = fragCoord/iResolution.xy;
@@ -169,6 +184,15 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     if(raymarching(ro, rd, info)){
         // 衝突時
         col = info.normal * 0.5 + 0.5;
+        
+        vec3 shadow_dir = LIGHT_DIR;
+        vec3 shadow_ori = info.position + shadow_dir * 0.02;
+        SurfaceInfo shadow_info;
+        bool hit = raymarching(shadow_ori, shadow_dir, shadow_info);
+        float shadow = 1.0 - float(hit);
+        col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) * shadow + 0.2);
+
+        col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) * 1. + 0.2);
     } else {
         col = vec3(0.0);
     }
