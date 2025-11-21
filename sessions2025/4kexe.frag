@@ -65,14 +65,15 @@ float map(vec3 pos, inout SDFInfo info) {
     float d;
     info.index = 0;
     
-    float tubeOuter = sdCappedCylinder(pos + vec3(0,0,1), 1.8, 4.5);
+    float tubeOuter = sdCappedCylinder(pos + vec3(0,0,0.0), 1.8, 2.5);
     
     float tubeWall = sdBox(pos - vec3(0,0,0), vec3(5, 5, 5.), 0.);
     
-    float roomFrontInner = sdBox(pos - vec3(0,0,-2.), vec3(3.5,4.,1.9), 0.);
+    float roomFrontInner = sdBox(pos - vec3(0,2,-2.), vec3(3.5,4.,1.9), 0.);
     
     // Z軸に長い立体から、奥行き1.5の円柱をくりぬく
-    d = max(-tubeOuter, tubeWall);
+    d = max(tubeWall, -tubeOuter);
+
     
     // 上でできた立体から手前側を別の立体でくり抜いて空間作る
     d = max(d, -roomFrontInner);
@@ -87,25 +88,27 @@ float map(vec3 pos, inout SDFInfo info) {
     // ファン
     float fanCenter = sdCappedCylinder(pos - vec3(0,0,.8), 0.35, .3);
     d = min(d, fanCenter);
+    // return d;
 
     vec3 q = pos;
     const int OBJ_NUM = 7;
 
     q -= vec3(0., 0., .7); // ファンの位置
-    q.xy = pmod(q.xy, float(OBJ_NUM));
-    q.xz *= rot(.1 * TAU);
 
-    q.xy *= rot(-0.06); // bladeに法線Artifact出ないよう微回転
-    // 2Dで形作ってextrude
-    float blade2D = sdUnevenCapsule(q.xy, .03, .4, 1.4);
-    vec2 w = vec2(blade2D, abs(q.z) - 0.1);
-    float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
-    d = min(d, blade);
+    q.xy *= rot(0.18); // ちょっとbladeたちを回しとく
 
+    for(int i=0; i<OBJ_NUM; i++) {
+        q.xy *= rot(0.9);
+        vec3 qq = q;
+        // qq.xz *= rot(.1 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
 
+        // 2Dで形作ってextrude
+        float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.4);
+        vec2 w = vec2(blade2D, abs(qq.z) - 0.1);
+        float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
+        d = min(d, blade);
+    }
 
-    
-    //return roomD;
     return d;
 }
 
@@ -126,12 +129,12 @@ struct SurfaceInfo {
 };
 
 #define NUM_MAT 2
-const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(0.0, 0.2, 0.0));
+const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0, 1.0, 1.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
     float dist;
-    float sumDist;
+    float sumDist = 0.;
     
     info.color = vec3(0.);
     info.normal = vec3(0.);
@@ -154,7 +157,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
     return false;
 }
 
-#define LIGHT_DIR normalize(vec3(0.5, 1.0, 0.0))
+#define LIGHT_DIR normalize(vec3(0.5, 1.0, -0.4))
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = fragCoord/iResolution.xy;
@@ -163,11 +166,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec2 p = suv;
     
-    vec3 ro = vec3(-1,-1.3,-4.);
+    vec3 ro = vec3(-1,-1.3,-3.8);
     // fanにちかづく
     // ro = vec3(-1,-1.3,-1.5);
 
-    // ro = vec3(-.0,-0.,-2.5);
+    // ro = vec3(0.0,1.0 * sin(iTime),-10.5);
     vec3 ta = vec3(-2, -5, 0);
     ta = vec3(0);
     vec3 fwd = normalize(ta - ro);
@@ -190,9 +193,12 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         SurfaceInfo shadow_info;
         bool hit = raymarching(shadow_ori, shadow_dir, shadow_info);
         float shadow = 1.0 - float(hit);
-        col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) * shadow + 0.2);
+        col = info.color * (max(dot(info.normal, LIGHT_DIR), 0.) * shadow + 0.2);
 
-        col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) * 1. + 0.2);
+        // float diff = max(dot(info.normal, LIGHT_DIR), 0.0);
+        // col = info.color * (diff + 0.2);
+
+        // col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) * 1. + 0.2);
     } else {
         col = vec3(0.0);
     }
