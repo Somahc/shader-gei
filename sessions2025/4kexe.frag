@@ -47,6 +47,17 @@ vec3 hemisphereSampling(vec2 uv){
     return vec3(sin(theta) * cos(phi),cos(theta),sin(theta) * sin(phi));
 }
 
+vec3 cosineSampling(vec2 uv,inout float pdf){
+    float theta = acos(1.0 - 2.0f * uv.x) * 0.5;
+    float phi = 2.0 * PI * uv.y;
+    pdf = cos(theta) / PI;
+    return vec3(sin(theta) * cos(phi),cos(theta),sin(theta) * sin(phi));
+}
+
+vec3 IBL(vec3 dir){
+    return vec3(0.0);
+}
+
 mat2 rot(float a) {
     float c = cos(a), s = sin(a);
     return mat2(c, s, -s, c);
@@ -108,7 +119,9 @@ float map(vec3 pos, inout SDFInfo info) {
     
     float tubeWall = sdBox(pos - vec3(0,0,0), vec3(5, 5, 5.), 0.);
     
-    float roomFrontInner = sdBox(pos - vec3(0,2,-2.), vec3(3.5,4.0,1.9), 0.);
+    float roomFrontInner = sdBox(pos - vec3(0,0,-2.), vec3(3.5,4.0,1.9), 0.);
+
+    float tubeFarLight = sdCappedCylinder(pos - vec3(0,0,4.5), 1.8, 2.5);
     
     // Z軸に長い立体から、奥行き1.5の円柱をくりぬく
     d = max(tubeWall, -tubeOuter);
@@ -117,10 +130,14 @@ float map(vec3 pos, inout SDFInfo info) {
     // 上でできた立体から手前側を別の立体でくり抜いて空間作る
     d = max(d, -roomFrontInner);
 
+    // ライトになる円柱奥の円柱
+    info.index = (tubeFarLight < d) ? 1 : info.index;
+    d = min(d, tubeFarLight);
+
     // 床面を合成
     float floorD = sdBox(pos - vec3(0,-2.3,-2.), vec3(5., .6, 6.), 0.);
 
-    info.index = (floorD < d) ? 1 : info.index;
+    info.index = (floorD < d) ? 0 : info.index;
 
     d = min(d, floorD);
 
@@ -169,10 +186,12 @@ struct SurfaceInfo {
     vec3 normal;
     vec3 position;
     float rayDist;
+    vec3 emission;
 };
 
 #define NUM_MAT 2
 const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(1.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -194,6 +213,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
             info.color = color[sdf_info.index];
             info.normal = getNormal(info.position);
             info.rayDist = sumDist;
+            info.emission = emission[sdf_info.index];
             return true;
         }
         sumDist += dist;
@@ -202,11 +222,13 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
 }
 
 #define LIGHT_DIR normalize(vec3(0.5, 1.0, -0.6))
-#define RTAO_NUM 16 // AO
+#define MAX_DEPTH 10 // パストレのバウンス最大
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
+    const bool DEBUG_NORMAL = false;
+
     seed = uint(uint(iFrame+1) * uint(fragCoord.x + iResolution.x * fragCoord.y));
-    //vec2 uv = (fragCoord + rnd2()) / iResolution.xy; //アンチエイリアス
+    // vec2 uv = (fragCoord + rnd2()) / iResolution.xy; //アンチエイリアス
     vec2 uv = (fragCoord)/iResolution.xy;
     vec2 asp = iResolution.xy / min(iResolution.x, iResolution.y);
     vec2 suv = (uv * 2. - 1.) * asp;
@@ -226,47 +248,65 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     up = normalize(cross(side ,fwd));
     float fov = 1.;
     vec3 rd = normalize(p.x * side + p.y * up + fwd * fov);
+
+    vec3 LTE = vec3(0.0); // 最終結果
+    vec3 throughput = vec3(1.0); // 反射率
     
     vec3 col = vec3(0.);
-    
-    
-    SurfaceInfo info;
-    if(raymarching(ro, rd, info)){
-        // 衝突時
-        col = info.normal * 0.5 + 0.5;
-        
-        vec3 shadow_dir = LIGHT_DIR;
-        vec3 shadow_ori = info.position + shadow_dir * 0.02;
-        SurfaceInfo shadow_info;
-        bool hit = raymarching(shadow_ori, shadow_dir, shadow_info);
-        float shadow = 1.0 - float(hit);
 
+    // Normalの確認デバッグ用
+    if(DEBUG_NORMAL) {
+        SurfaceInfo info;
+        if (raymarching(ro, rd, info)) {
+            col = info.normal * 0.5 + 0.5;
+        } else {
+            col = vec3(0.0);
+        }
+    }
+    //ここまで
+    
+    for(int i=0; i<MAX_DEPTH; i++) {
+        SurfaceInfo info;
+        if(!raymarching(ro, rd, info)) {
+            // 衝突しなかったらその時点でのLTE加算をしてbreak
+            LTE += throughput * IBL(rd);
+            break;
+        }
+
+        if(length(info.emission) > 0.0){
+            //光源に衝突した場合
+            LTE += throughput * info.emission;
+            break;
+        }
+
+        // 衝突時
+        
         vec3 tangent, binormal;
         tangentSpaceBasis(info.normal, tangent, binormal);
+        vec3 normal = info.normal;
 
-        float RTAO = 0.0;
-        for(int i=0; i < RTAO_NUM; i++) {
-            vec3 dir = hemisphereSampling(rnd2());
-            dir = localToWorld(tangent, info.normal, binormal, dir);
-            vec3 ori = info.position + dir * 0.02;
-            SurfaceInfo rtaoInfo;
-            bool hit = raymarching(ori, dir, rtaoInfo);
+        vec3 localWo = worldToLocal(tangent, normal, binormal, -rd);
 
-            if(rtaoInfo.rayDist < 1.0) {
-                RTAO += float(hit);
-            }
-        }
-        RTAO = (1.0 - RTAO / float(RTAO_NUM));
+        // 方向サンプリング
+        float pdf;
+        vec3 local_wi = cosineSampling(rnd2(), pdf);
 
-        col = info.color * (max(dot(info.normal, LIGHT_DIR), 0.) * shadow + 0.2) * RTAO;
+        vec3 wi = localToWorld(tangent, normal, binormal, local_wi);
 
-        // col = info.color * (max(dot(info.normal, LIGHT_DIR), 0.) * shadow + 0.2) * 1.;
-    } else {
-        col = vec3(0.0);
+        // BSDFの計算
+        vec3 bsdf = info.color / PI; // Lambert
+        float cosine = dot(wi, normal);
+
+        // throughputの更新
+        throughput *= bsdf * cosine / pdf;
+
+        // レイの更新
+        rd = wi;
+        ro = info.position + rd * 0.01;
     }
     
+    if(!DEBUG_NORMAL) col = LTE;
     
-
     // Output to screen
     fragColor = vec4(col, 1.0);
 }
