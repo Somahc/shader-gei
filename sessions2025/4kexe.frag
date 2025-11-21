@@ -313,9 +313,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
 
     // ゴッドレイ・ボリュームレンダリング
-    vec3 godrayColor = vec3(1.0);
-    vec3 lightDir = vec3(0., 0.5, 0.8);
-    float toAdd = 0.6 / float(GODRAY_SAMPLES);
+    vec3 lightDir = vec3(0., 0.2, 0.8);
+    float toAdd = 0.15 / float(GODRAY_SAMPLES);
 
     if(length(end) < 1e8) {
         for(int i=0; i<GODRAY_SAMPLES; i++) {
@@ -323,7 +322,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             SurfaceInfo godray_info;
             if(raymarching(p, lightDir, godray_info)) {
                 if (length(godray_info.emission) > 0.0) {
-                    LTE += godrayColor * toAdd;
+                    LTE += godray_info.emission * toAdd;
                 }
             }
         }
