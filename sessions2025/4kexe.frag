@@ -69,7 +69,7 @@ float map(vec3 pos, inout SDFInfo info) {
     
     float tubeWall = sdBox(pos - vec3(0,0,0), vec3(5, 5, 5.), 0.);
     
-    float roomFrontInner = sdBox(pos - vec3(0,2,-2.), vec3(3.5,4.,1.9), 0.);
+    float roomFrontInner = sdBox(pos - vec3(0,2,-2.), vec3(3.5,4.0,1.9), 0.);
     
     // Z軸に長い立体から、奥行き1.5の円柱をくりぬく
     d = max(tubeWall, -tubeOuter);
@@ -87,6 +87,7 @@ float map(vec3 pos, inout SDFInfo info) {
 
     // ファン
     float fanCenter = sdCappedCylinder(pos - vec3(0,0,.8), 0.35, .3);
+    info.index = (fanCenter < d) ? 0 : info.index;
     d = min(d, fanCenter);
     // return d;
 
@@ -106,8 +107,10 @@ float map(vec3 pos, inout SDFInfo info) {
         float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.4);
         vec2 w = vec2(blade2D, abs(qq.z) - 0.1);
         float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
+        info.index = (blade < d) ? 0 : info.index;
         d = min(d, blade);
     }
+
 
     return d;
 }
@@ -129,7 +132,7 @@ struct SurfaceInfo {
 };
 
 #define NUM_MAT 2
-const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0, 1.0, 1.0));
+const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0, .0, 1.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -157,7 +160,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
     return false;
 }
 
-#define LIGHT_DIR normalize(vec3(0.5, 1.0, -0.4))
+#define LIGHT_DIR normalize(vec3(0.5, 1.0, -0.6))
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = fragCoord/iResolution.xy;
