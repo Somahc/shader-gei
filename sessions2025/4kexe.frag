@@ -223,6 +223,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
 
 #define LIGHT_DIR normalize(vec3(0.5, 1.0, -0.6))
 #define MAX_DEPTH 10 // パストレのバウンス最大
+#define GODRAY_SAMPLES 8 // ゴッドレイのサンプル数
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     const bool DEBUG_NORMAL = false;
@@ -240,6 +241,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // ro = vec3(-1,-1.3,-1.5);
 
     // ro = vec3(0.0,1.0 * sin(iTime),-10.5);
+    vec3 camPos = ro;
     vec3 ta = vec3(-2, -5, 0);
     ta = vec3(0);
     vec3 fwd = normalize(ta - ro);
@@ -265,12 +267,17 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     //ここまで
     
-    for(int i=0; i<MAX_DEPTH; i++) {
+    vec3 end = vec3(1e9);
+    for(int b=0; b<MAX_DEPTH; b++) {
         SurfaceInfo info;
         if(!raymarching(ro, rd, info)) {
             // 衝突しなかったらその時点でのLTE加算をしてbreak
             LTE += throughput * IBL(rd);
             break;
+        }
+
+        if(b == 0) {
+            end = info.position; // 最初のレイ衝突地点
         }
 
         if(length(info.emission) > 0.0){
@@ -303,6 +310,23 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         // レイの更新
         rd = wi;
         ro = info.position + rd * 0.01;
+    }
+
+    // ゴッドレイ・ボリュームレンダリング
+    vec3 godrayColor = vec3(1.0);
+    vec3 lightDir = vec3(0., 0.5, 0.8);
+    float toAdd = 0.6 / float(GODRAY_SAMPLES);
+
+    if(length(end) < 1e8) {
+        for(int i=0; i<GODRAY_SAMPLES; i++) {
+            vec3 p = mix(camPos, end, rnd1());
+            SurfaceInfo godray_info;
+            if(raymarching(p, lightDir, godray_info)) {
+                if (length(godray_info.emission) > 0.0) {
+                    LTE += godrayColor * toAdd;
+                }
+            }
+        }
     }
     
     if(!DEBUG_NORMAL) col = LTE;
