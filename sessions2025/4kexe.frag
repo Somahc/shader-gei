@@ -1,6 +1,24 @@
 const float PI = acos(-1.);
 const float TAU = PI * 2.;
 
+uint seed;
+uint PCGHash()
+{
+    seed = seed * 747796405u + 2891336453u;
+    uint state = seed;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float rnd1()
+{
+    return float(PCGHash()) / float(0xFFFFFFFFU);    
+}
+
+vec2 rnd2(){
+    return vec2(rnd1(),rnd1());
+}
+
 mat3 orthBas(vec3 z){
   z=normalize(z);
   vec3 up=abs(z.y)>.999?vec3(0,0,1):vec3(0,1,0);
@@ -163,7 +181,9 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
 #define LIGHT_DIR normalize(vec3(0.5, 1.0, -0.6))
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    vec2 uv = fragCoord/iResolution.xy;
+    seed = uint(uint(iFrame+1) * uint(fragCoord.x + iResolution.x * fragCoord.y));
+    // vec2 uv = (fragCoord + rnd2())/iResolution.xy; アンチエイリアス
+    vec2 uv = (fragCoord)/iResolution.xy;
     vec2 asp = iResolution.xy / min(iResolution.x, iResolution.y);
     vec2 suv = (uv * 2. - 1.) * asp;
     
