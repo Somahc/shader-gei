@@ -26,6 +26,27 @@ mat3 orthBas(vec3 z){
   return mat3(x,cross(z,x),z);
 }
 
+void tangentSpaceBasis(vec3 normal,inout vec3 tangent,inout vec3 binormal){
+    vec3 d = vec3(0,1,0);
+    if(abs(normal.y) > 0.99) d = vec3(0,0,1);
+    tangent = normalize(cross(normal,d));
+    binormal = normalize(cross(tangent,normal));
+}
+
+vec3 worldToLocal(vec3 tangent,vec3 normal,vec3 binormal,vec3 world){
+    return vec3(dot(world,tangent),dot(world,normal),dot(world,binormal));
+}
+
+vec3 localToWorld(vec3 tangent,vec3 normal,vec3 binormal,vec3 local){
+    return tangent * local.x + binormal * local.z + normal * local.y;
+}
+
+vec3 hemisphereSampling(vec2 uv){
+    float theta = acos(uv.x);
+    float phi = 2.0 * PI * uv.y;
+    return vec3(sin(theta) * cos(phi),cos(theta),sin(theta) * sin(phi));
+}
+
 mat2 rot(float a) {
     float c = cos(a), s = sin(a);
     return mat2(c, s, -s, c);
@@ -147,10 +168,11 @@ struct SurfaceInfo {
     vec3 color;
     vec3 normal;
     vec3 position;
+    float rayDist;
 };
 
 #define NUM_MAT 2
-const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0, .0, 1.0));
+const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -171,6 +193,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
             // info.color = vec3(1.);
             info.color = color[sdf_info.index];
             info.normal = getNormal(info.position);
+            info.rayDist = sumDist;
             return true;
         }
         sumDist += dist;
@@ -179,10 +202,11 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
 }
 
 #define LIGHT_DIR normalize(vec3(0.5, 1.0, -0.6))
+#define RTAO_NUM 16 // AO
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     seed = uint(uint(iFrame+1) * uint(fragCoord.x + iResolution.x * fragCoord.y));
-    // vec2 uv = (fragCoord + rnd2())/iResolution.xy; アンチエイリアス
+    //vec2 uv = (fragCoord + rnd2()) / iResolution.xy; //アンチエイリアス
     vec2 uv = (fragCoord)/iResolution.xy;
     vec2 asp = iResolution.xy / min(iResolution.x, iResolution.y);
     vec2 suv = (uv * 2. - 1.) * asp;
@@ -216,12 +240,27 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         SurfaceInfo shadow_info;
         bool hit = raymarching(shadow_ori, shadow_dir, shadow_info);
         float shadow = 1.0 - float(hit);
-        col = info.color * (max(dot(info.normal, LIGHT_DIR), 0.) * shadow + 0.2);
 
-        // float diff = max(dot(info.normal, LIGHT_DIR), 0.0);
-        // col = info.color * (diff + 0.2);
+        vec3 tangent, binormal;
+        tangentSpaceBasis(info.normal, tangent, binormal);
 
-        // col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) * 1. + 0.2);
+        float RTAO = 0.0;
+        for(int i=0; i < RTAO_NUM; i++) {
+            vec3 dir = hemisphereSampling(rnd2());
+            dir = localToWorld(tangent, info.normal, binormal, dir);
+            vec3 ori = info.position + dir * 0.02;
+            SurfaceInfo rtaoInfo;
+            bool hit = raymarching(ori, dir, rtaoInfo);
+
+            if(rtaoInfo.rayDist < 1.0) {
+                RTAO += float(hit);
+            }
+        }
+        RTAO = (1.0 - RTAO / float(RTAO_NUM));
+
+        col = info.color * (max(dot(info.normal, LIGHT_DIR), 0.) * shadow + 0.2) * RTAO;
+
+        // col = info.color * (max(dot(info.normal, LIGHT_DIR), 0.) * shadow + 0.2) * 1.;
     } else {
         col = vec3(0.0);
     }
