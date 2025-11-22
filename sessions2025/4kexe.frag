@@ -99,6 +99,18 @@ float sdSphere(vec3 p, float r) {
     return length(p) - r;
 }
 
+float sdStandWithFence(vec3 pos, vec3 standPos) {
+    float d = 1e10;
+    // float  fanFrontStandD = sdBox(pos - float3(0,-1.72,-0.15), float3(0.14,0.02,0.1), 0.0);
+    float fanFrontStandD = sdBox(pos - standPos, vec3(0.14,0.02,0.1), 0.0);
+    d = min(d, fanFrontStandD);
+    float tesuriD = sdBox(pos - vec3(standPos.x,standPos.y + 0.06,standPos.z -0.07), vec3(0.11,0.05,0.005), 0.0);
+    float tesuriHallD = sdBox(pos - vec3(standPos.x,standPos.y + 0.06,standPos.z -0.07), vec3(0.1,0.04,0.1), 0.0);
+    tesuriD = max(tesuriD, -tesuriHallD);
+    d = min(d, tesuriD);
+    return d;
+}
+
 struct RayHitInfo {
     float dist;
     vec3 normal;
@@ -114,32 +126,72 @@ struct SDFInfo {
 float map(vec3 pos, inout SDFInfo info) {
     float d;
     info.index = 0;
-    
-    float tubeOuter = sdCappedCylinder(pos + vec3(0,0,0.0), 1.8, 5.0);
-    
-    float tubeWall = sdBox(pos - vec3(0,0,0), vec3(5, 5, 10.), 0.);
-    
-    float roomFrontInner = sdBox(pos - vec3(0,0,-2.), vec3(3.5,4.0,1.9), 0.);
+    float tubeOuter      = sdCappedCylinder(pos + vec3(0.0, 0.0, 0.0), 1.8, 5.0);
+    float tubeWall       = sdBox(pos - vec3(0.0, 0.0, 0.0), vec3(5.0, 5.0, 10.0), 0.0);
+    float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(3.5, 4.0, 3.9), 0.0);
+    float tubeFarLight   = sdCappedCylinder(pos - vec3(0.0, 0.0, 7.0), 2.0, 2.5);
 
-    float tubeFarLight = sdCappedCylinder(pos - vec3(0,0,7.0), 2.0, 2.5);
-    
-    // Z軸に長い立体から、奥行き1.5の円柱をくりぬく
+    // Z 軸方向に長い立体 − 外側円柱（トンネルの空間）
     d = max(tubeWall, -tubeOuter);
 
-    
-    // 上でできた立体から手前側を別の立体でくり抜いて空間作る
+    // 手前側をくり抜いて空間を作る
     d = max(d, -roomFrontInner);
 
-    // ライトになる円柱奥の円柱
+    // ライト用の奥の円柱
     info.index = (tubeFarLight < d) ? 1 : info.index;
     d = min(d, tubeFarLight);
 
-    // 床面を合成
-    float floorD = sdBox(pos - vec3(0,-2.3,-2.), vec3(5., .6, 6.), 0.);
-
-    info.index = (floorD < d) ? 0 : info.index;
-
+    // 床
+    float floorD = sdBox(pos - vec3(0.0, -2.3, 5.9), vec3(5.0, 0.6, 6.0), 0.0);
     d = min(d, floorD);
+
+    // 壁の柱 (left)
+    float hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -2.0), vec3(1.0, 10.0, 0.4), 0.0);
+    d = min(d, hashiraLeftD);
+
+    hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -5.5), vec3(1.0, 10.0, 0.4), 0.0);
+    d = min(d, hashiraLeftD);
+
+    // 壁の柱 (right)
+    float hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -2.0), vec3(1.0, 10.0, 0.4), 0.0);
+    d = min(d, hashiraRightD);
+
+    hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -5.5), vec3(1.0, 10.0, 0.4), 0.0);
+    d = min(d, hashiraRightD);
+
+    // ファンの前の台
+    for (int i = 0; i < 5; i++) {
+        float fanFrontStandD = sdStandWithFence(pos, vec3(-0.5 + float(i) * 0.25, -1.72, -0.15));
+        d = min(d, fanFrontStandD);
+    }
+
+    // はしご
+    float ladderStandD = sdBox(pos - vec3(0.65, -1.72, -0.15), vec3(0.14, 0.02, 0.1), 0.0);
+    d = min(d, ladderStandD);
+
+    // 縦棒
+    vec3 posForLadder = pos;
+    posForLadder.yz *= rot(TAU * 1.25);
+    float ladderD = sdCappedCylinder(posForLadder - vec3(0.68, -0.27, 2.2), 0.0003, 0.5);
+    d = min(d, ladderD);
+    ladderD = sdCappedCylinder(posForLadder - vec3(0.75, -0.27, 2.2), 0.0003, 0.5);
+    d = min(d, ladderD);
+
+    // 横棒
+    vec3 posForLadderH = pos;
+    posForLadderH.xz *= rot(TAU * 1.25);
+    for (int i = 0; i < 20; i++) {
+        ladderD = sdCappedCylinder(
+            posForLadderH - vec3(-0.27, -1.8 + float(i) * -0.05, -0.717),
+            0.0003,
+            0.033
+        );
+        d = min(d, ladderD);
+    }
+
+    // 床（手前）
+    float floorFrontD = sdBox(pos - vec3(0.0, -3.25, 2.0), vec3(5.0, 0.6, 10.0), 0.0);
+    d = min(d, floorFrontD);
 
     // ファン
     float fanCenter = sdCappedCylinder(pos - vec3(0,0,.8), 0.35, .3);
@@ -226,6 +278,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
 #define GODRAY_SAMPLES 8 // ゴッドレイのサンプル数
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
+    const bool DEBUG = true;
     const bool DEBUG_NORMAL = false;
 
     seed = uint(uint(iFrame+1) * uint(fragCoord.x + iResolution.x * fragCoord.y));
@@ -240,10 +293,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // fanにちかづく
     // ro = vec3(-1,-1.3,-1.5);
 
-    // ro = vec3(0.0,1.0 * sin(iTime),-10.5);
+    // ro = vec3(1,-2.3,-0.8);
     vec3 camPos = ro;
     vec3 ta = vec3(-2, -5, 0);
-    ta = vec3(0);
+    ta = vec3(0, -1.0,0 );
     vec3 fwd = normalize(ta - ro);
     vec3 up = vec3(0, 1, 0);
     vec3 side = normalize(cross(fwd, up));
@@ -256,80 +309,81 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec3 col = vec3(0.);
 
-    // Normalの確認デバッグ用
-    if(DEBUG_NORMAL) {
+    // デバッグ用
+    if(DEBUG) {
         SurfaceInfo info;
         if (raymarching(ro, rd, info)) {
-            col = info.normal * 0.5 + 0.5;
+            col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) + 0.2);
+            if (DEBUG_NORMAL) col = info.normal * 0.5 + 0.5;
         } else {
             col = vec3(0.0);
         }
-    }
-    //ここまで
-    
-    vec3 end = vec3(1e9);
-    for(int b=0; b<MAX_DEPTH; b++) {
-        SurfaceInfo info;
-        if(!raymarching(ro, rd, info)) {
-            // 衝突しなかったらその時点でのLTE加算をしてbreak
-            LTE += throughput * IBL(rd);
-            break;
+    } else {
+
+        vec3 end = vec3(1e9);
+        for(int b=0; b<MAX_DEPTH; b++) {
+            SurfaceInfo info;
+            if(!raymarching(ro, rd, info)) {
+                // 衝突しなかったらその時点でのLTE加算をしてbreak
+                LTE += throughput * IBL(rd);
+                break;
+            }
+
+            if(b == 0) {
+                end = info.position; // 最初のレイ衝突地点
+            }
+
+            if(length(info.emission) > 0.0){
+                //光源に衝突した場合
+                LTE += throughput * info.emission;
+                break;
+            }
+
+            // 衝突時
+            
+            vec3 tangent, binormal;
+            tangentSpaceBasis(info.normal, tangent, binormal);
+            vec3 normal = info.normal;
+
+            vec3 localWo = worldToLocal(tangent, normal, binormal, -rd);
+
+            // 方向サンプリング
+            float pdf;
+            vec3 local_wi = cosineSampling(rnd2(), pdf);
+
+            vec3 wi = localToWorld(tangent, normal, binormal, local_wi);
+
+            // BSDFの計算
+            vec3 bsdf = info.color / PI; // Lambert
+            float cosine = dot(wi, normal);
+
+            // throughputの更新
+            throughput *= bsdf * cosine / pdf;
+
+            // レイの更新
+            rd = wi;
+            ro = info.position + rd * 0.01;
         }
 
-        if(b == 0) {
-            end = info.position; // 最初のレイ衝突地点
-        }
+        // ゴッドレイ・ボリュームレンダリング
+        vec3 lightDir = vec3(0., 0.2, 0.8);
+        float toAdd = 0.15 / float(GODRAY_SAMPLES);
 
-        if(length(info.emission) > 0.0){
-            //光源に衝突した場合
-            LTE += throughput * info.emission;
-            break;
-        }
-
-        // 衝突時
-        
-        vec3 tangent, binormal;
-        tangentSpaceBasis(info.normal, tangent, binormal);
-        vec3 normal = info.normal;
-
-        vec3 localWo = worldToLocal(tangent, normal, binormal, -rd);
-
-        // 方向サンプリング
-        float pdf;
-        vec3 local_wi = cosineSampling(rnd2(), pdf);
-
-        vec3 wi = localToWorld(tangent, normal, binormal, local_wi);
-
-        // BSDFの計算
-        vec3 bsdf = info.color / PI; // Lambert
-        float cosine = dot(wi, normal);
-
-        // throughputの更新
-        throughput *= bsdf * cosine / pdf;
-
-        // レイの更新
-        rd = wi;
-        ro = info.position + rd * 0.01;
-    }
-
-    // ゴッドレイ・ボリュームレンダリング
-    vec3 lightDir = vec3(0., 0.2, 0.8);
-    float toAdd = 0.15 / float(GODRAY_SAMPLES);
-
-    if(length(end) < 1e8) {
-        for(int i=0; i<GODRAY_SAMPLES; i++) {
-            vec3 p = mix(camPos, end, rnd1());
-            SurfaceInfo godray_info;
-            if(raymarching(p, lightDir, godray_info)) {
-                if (length(godray_info.emission) > 0.0) {
-                    LTE += godray_info.emission * toAdd;
+        if(length(end) < 1e8) {
+            for(int i=0; i<GODRAY_SAMPLES; i++) {
+                vec3 p = mix(camPos, end, rnd1());
+                SurfaceInfo godray_info;
+                if(raymarching(p, lightDir, godray_info)) {
+                    if (length(godray_info.emission) > 0.0) {
+                        LTE += godray_info.emission * toAdd;
+                    }
                 }
             }
         }
+        
+        col = LTE;
+        
     }
-    
-    if(!DEBUG_NORMAL) col = LTE;
-    
     // Output to screen
     fragColor = vec4(col, 1.0);
 }
