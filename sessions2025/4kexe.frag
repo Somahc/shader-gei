@@ -115,13 +115,13 @@ float map(vec3 pos, inout SDFInfo info) {
     float d;
     info.index = 0;
     
-    float tubeOuter = sdCappedCylinder(pos + vec3(0,0,0.0), 1.8, 2.5);
+    float tubeOuter = sdCappedCylinder(pos + vec3(0,0,0.0), 1.8, 5.0);
     
-    float tubeWall = sdBox(pos - vec3(0,0,0), vec3(5, 5, 5.), 0.);
+    float tubeWall = sdBox(pos - vec3(0,0,0), vec3(5, 5, 10.), 0.);
     
     float roomFrontInner = sdBox(pos - vec3(0,0,-2.), vec3(3.5,4.0,1.9), 0.);
 
-    float tubeFarLight = sdCappedCylinder(pos - vec3(0,0,4.5), 1.8, 2.5);
+    float tubeFarLight = sdCappedCylinder(pos - vec3(0,0,7.0), 2.0, 2.5);
     
     // Z軸に長い立体から、奥行き1.5の円柱をくりぬく
     d = max(tubeWall, -tubeOuter);
@@ -160,7 +160,7 @@ float map(vec3 pos, inout SDFInfo info) {
         // qq.xz *= rot(.1 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
 
         // 2Dで形作ってextrude
-        float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.4);
+        float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.35);
         vec2 w = vec2(blade2D, abs(qq.z) - 0.1);
         float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
         info.index = (blade < d) ? 0 : info.index;
@@ -191,7 +191,7 @@ struct SurfaceInfo {
 
 #define NUM_MAT 2
 const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0));
-const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(1.0));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
