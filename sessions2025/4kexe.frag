@@ -1,3 +1,9 @@
+#define MAT_UNDEFINED -1
+#define MAT_FLOOR 0
+#define MAT_LIGHT 1
+#define MAT_WALL 2
+#define MAT_METAL 3
+
 const float PI = acos(-1.);
 const float TAU = PI * 2.;
 
@@ -17,6 +23,14 @@ float rnd1()
 
 vec2 rnd2(){
     return vec2(rnd1(),rnd1());
+}
+
+// #define saturate(x) clamp(x, 0.0, 1.0)
+
+// 視点マウス操作用の制限
+float remap(float val, float inMin, float inMax, float outMin, float outMax)
+{
+    return clamp(outMin + (val - inMin) * (outMax - outMin) / (inMax - inMin), outMin, outMax);
 }
 
 mat3 orthBas(vec3 z){
@@ -125,7 +139,7 @@ struct SDFInfo {
 // ジオメトリを定義
 float map(vec3 pos, inout SDFInfo info) {
     float d;
-    info.index = 0;
+    info.index = MAT_WALL;
     float tubeOuter      = sdCappedCylinder(pos + vec3(0.0, 0.0, 0.0), 1.8, 5.0);
     float tubeWall       = sdBox(pos - vec3(0.0, 0.0, 0.0), vec3(5.0, 5.0, 10.0), 0.0);
     float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(3.5, 4.0, 3.9), 0.0);
@@ -138,43 +152,57 @@ float map(vec3 pos, inout SDFInfo info) {
     d = max(d, -roomFrontInner);
 
     // ライト用の奥の円柱
-    info.index = (tubeFarLight < d) ? 1 : info.index;
+    info.index = (tubeFarLight < d) ? MAT_LIGHT : info.index;
     d = min(d, tubeFarLight);
 
     // 床
     float floorD = sdBox(pos - vec3(0.0, -2.3, 5.9), vec3(5.0, 0.6, 6.0), 0.0);
+    info.index = (floorD < d) ? MAT_FLOOR : info.index;
     d = min(d, floorD);
+
+    // 床（手前）
+    float floorFrontD = sdBox(pos - vec3(0.0, -3.25, 2.0), vec3(5.0, 0.6, 10.0), 0.0);
+    info.index = (floorFrontD < d) ? MAT_FLOOR : info.index;
+    d = min(d, floorFrontD);
 
     // 壁の柱 (left)
     float hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -2.0), vec3(1.0, 10.0, 0.4), 0.0);
+    info.index = (hashiraLeftD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraLeftD);
 
     hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -5.5), vec3(1.0, 10.0, 0.4), 0.0);
+    info.index = (hashiraLeftD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraLeftD);
 
     // 壁の柱 (right)
     float hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -2.0), vec3(1.0, 10.0, 0.4), 0.0);
+    info.index = (hashiraRightD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraRightD);
 
     hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -5.5), vec3(1.0, 10.0, 0.4), 0.0);
+    info.index = (hashiraRightD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraRightD);
 
     // ファンの前の台
     for (int i = 0; i < 5; i++) {
         float fanFrontStandD = sdStandWithFence(pos, vec3(-0.5 + float(i) * 0.25, -1.72, -0.15));
+        info.index = (fanFrontStandD < d) ? MAT_METAL : info.index;
         d = min(d, fanFrontStandD);
     }
 
     // はしご
     float ladderStandD = sdBox(pos - vec3(0.65, -1.72, -0.15), vec3(0.14, 0.02, 0.1), 0.0);
+    info.index = (ladderStandD < d) ? MAT_METAL : info.index;
     d = min(d, ladderStandD);
 
     // 縦棒
     vec3 posForLadder = pos;
     posForLadder.yz *= rot(TAU * 1.25);
     float ladderD = sdCappedCylinder(posForLadder - vec3(0.68, -0.27, 2.2), 0.0003, 0.5);
+    info.index = (ladderD < d) ? MAT_METAL : info.index;
     d = min(d, ladderD);
     ladderD = sdCappedCylinder(posForLadder - vec3(0.75, -0.27, 2.2), 0.0003, 0.5);
+    info.index = (ladderD < d) ? MAT_METAL : info.index;
     d = min(d, ladderD);
 
     // 横棒
@@ -186,16 +214,13 @@ float map(vec3 pos, inout SDFInfo info) {
             0.0003,
             0.033
         );
+        info.index = (ladderD < d) ? MAT_METAL : info.index;
         d = min(d, ladderD);
     }
 
-    // 床（手前）
-    float floorFrontD = sdBox(pos - vec3(0.0, -3.25, 2.0), vec3(5.0, 0.6, 10.0), 0.0);
-    d = min(d, floorFrontD);
-
     // ファン
     float fanCenter = sdCappedCylinder(pos - vec3(0,0,.8), 0.35, .3);
-    info.index = (fanCenter < d) ? 0 : info.index;
+    info.index = (fanCenter < d) ? MAT_METAL : info.index;
     d = min(d, fanCenter);
     // return d;
 
@@ -215,7 +240,7 @@ float map(vec3 pos, inout SDFInfo info) {
         float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.35);
         vec2 w = vec2(blade2D, abs(qq.z) - 0.1);
         float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
-        info.index = (blade < d) ? 0 : info.index;
+        info.index = (blade < d) ? MAT_METAL : info.index;
         d = min(d, blade);
     }
 
@@ -241,9 +266,24 @@ struct SurfaceInfo {
     vec3 emission;
 };
 
-#define NUM_MAT 2
-const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0), vec3(1.0));
-const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5));
+void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
+    vec3 dPos = info.position;
+    vec3 diff = info.color;
+    if (sdf_info.index == MAT_UNDEFINED) diff = vec3(1.0, 0.0, 1.0);
+    // キャットウォーク下がおかしくなる 上向きの部分だけ床マテリアルになるよう法線での指定も(それでも完全には直らない)
+    if(sdf_info.index == MAT_FLOOR && info.normal.y > 0.9) {
+        diff = vec3(1,0,0);
+    }
+    if (sdf_info.index == MAT_WALL)  diff = vec3(0,1,0);
+    if (sdf_info.index == MAT_METAL) diff = vec3(0,0,1);
+    if (sdf_info.index == MAT_LIGHT) diff = vec3(1,1,0);
+
+    info.color = diff;
+}
+
+#define NUM_MAT 4
+const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5),vec3(0.0),vec3(0.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -261,11 +301,13 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
         
         if (dist < 0.001){
             info.position = rPos;
-            // info.color = vec3(1.);
             info.color = color[sdf_info.index];
             info.normal = getNormal(info.position);
             info.rayDist = sumDist;
             info.emission = emission[sdf_info.index];
+
+            materialize(info, sdf_info);
+
             return true;
         }
         sumDist += dist;
@@ -294,6 +336,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // ro = vec3(-1,-1.3,-1.5);
 
     // ro = vec3(1,-2.3,-0.8);
+
+    // マウスで視点動かせるように
+    float mousex = 1.0*iMouse.x/iResolution.x + 0.75;
+    float mousey = remap(iMouse.y/iResolution.y, 0.0, 1.0, 1.5, 10.0);
+    ro = vec3(-5.0 * cos(mousex), mousey - 5., -5.0 * sin(mousex));
     vec3 camPos = ro;
     vec3 ta = vec3(-2, -5, 0);
     ta = vec3(0, -1.0,0 );
@@ -382,7 +429,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         
         col = LTE;
-        
+
     }
     // Output to screen
     fragColor = vec4(col, 1.0);
