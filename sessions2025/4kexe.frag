@@ -157,7 +157,8 @@ float map(vec3 pos, inout SDFInfo info) {
 
     // 床
     float floorD = sdBox(pos - vec3(0.0, -2.3, 5.9), vec3(5.0, 0.6, 6.0), 0.0);
-    info.index = (floorD < d) ? MAT_FLOOR : info.index;
+    // ↓がファン下のアーティファクトの原因だったのでコメントアウト
+    // info.index = (floorD < d) ? MAT_FLOOR : info.index;
     d = min(d, floorD);
 
     // 床（手前）
@@ -248,6 +249,19 @@ float map(vec3 pos, inout SDFInfo info) {
     return d;
 }
 
+// Thanks Shane - https://www.shadertoy.com/view/lstGRB
+float noise(vec3 p) {
+	const vec3 s = vec3(7.0, 157.0, 113.0);
+	vec3 ip = floor(p);
+    vec4 h = vec4(0.0, s.yz, s.y + s.z) + dot(ip, s);
+	p -= ip;
+	
+    h = mix(fract(sin(h) * 43758.5453), fract(sin(h + s.x) * 43758.5453), p.x);
+	
+    h.xy = mix(h.xz, h.yw, p.y);
+    return mix(h.x, h.y, p.z);
+}
+
 vec3 getNormal(vec3 pos) {
         vec3 EPS = vec3(0.001, 0., 0.);
         SDFInfo dummy;
@@ -266,15 +280,41 @@ struct SurfaceInfo {
     vec3 emission;
 };
 
+// See: https://www.shadertoy.com/view/WllfzB
+vec3 getConcreteMaterial(vec3 p, float dist, float id) {
+    vec3 mat;
+    vec3 tp =  p + vec3(0.32, 0.40, 1.2) * mod(id, 10.0);
+    
+    // Mix a couple of shades of grey.
+    float baseColor = smoothstep(0.0, 0.5, noise(tp));
+    mat = mix(vec3(0.18, 0.17, 0.17), vec3(0.20, 0.19, 0.19), baseColor);
+
+    // Surface roughness.
+    dist = 1.0 - smoothstep(0.0, 1.0, dist / 14.0);
+    float rough = noise(tp * 60.0) * 0.005 // Base
+         		  + step(0.2, noise(tp * 26.666)) * 0.0033; // Pits/dents.
+    mat += rough * 24.0;
+    
+    // Fade surface roughness(/deflection) out with distance to prevent screen noise.
+    // return rough * dist;
+    return mat;
+}
+
 void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
     vec3 dPos = info.position;
     vec3 diff = info.color;
     if (sdf_info.index == MAT_UNDEFINED) diff = vec3(1.0, 0.0, 1.0);
     // キャットウォーク下がおかしくなる 上向きの部分だけ床マテリアルになるよう法線での指定も(それでも完全には直らない)
     if(sdf_info.index == MAT_FLOOR && info.normal.y > 0.9) {
-        diff = vec3(1,0,0);
+        diff = vec3(0,0,0);
+        vec2 st = vec2(info.position.x, info.position.z); //床だからx,z座標をUVとして渡す
+        diff = getConcreteMaterial(info.position, info.rayDist, 0.0);
     }
-    if (sdf_info.index == MAT_WALL)  diff = vec3(0,1,0);
+    if (sdf_info.index == MAT_WALL) {
+        diff = vec3(0,0,0);
+        vec2 st = vec2(info.position.y, info.position.z); //床だからx,z座標をUVとして渡す
+        diff = getConcreteMaterial(info.position, info.rayDist, 0.0);
+    };
     if (sdf_info.index == MAT_METAL) diff = vec3(0,0,1);
     if (sdf_info.index == MAT_LIGHT) diff = vec3(1,1,0);
 
