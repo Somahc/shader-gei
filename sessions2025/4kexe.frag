@@ -304,8 +304,7 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
     vec3 dPos = info.position;
     vec3 diff = info.color;
     if (sdf_info.index == MAT_UNDEFINED) diff = vec3(1.0, 0.0, 1.0);
-    // キャットウォーク下がおかしくなる 上向きの部分だけ床マテリアルになるよう法線での指定も(それでも完全には直らない)
-    if(sdf_info.index == MAT_FLOOR && info.normal.y > 0.9) {
+    if(sdf_info.index == MAT_FLOOR) {
         diff = vec3(0,0,0);
         vec2 st = vec2(info.position.x, info.position.z); //床だからx,z座標をUVとして渡す
         diff = getConcreteMaterial(info.position, info.rayDist, 0.0);
