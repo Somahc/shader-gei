@@ -327,7 +327,7 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
         vec2 st = vec2(info.position.y, info.position.z); //床だからx,z座標をUVとして渡す
         diff = getConcreteMaterial(info.position, info.rayDist, 0.0);
     };
-    if (sdf_info.index == MAT_METAL) diff = vec3(0,0,1);
+    if (sdf_info.index == MAT_METAL) diff = vec3(0,0,0);
     if (sdf_info.index == MAT_LIGHT) diff = vec3(1,1,0);
 
     info.color = diff;
@@ -422,6 +422,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         vec3 end = vec3(1e9);
         for(int b=0; b<MAX_DEPTH; b++) {
             SurfaceInfo info;
+
+            float russian_p = clamp(max(max(throughput.x, throughput.y), throughput.z), 0.0, 1.0);
+            if (russian_p < rnd1()) {
+                break;
+            }
+            throughput /= russian_p;
+            
             if(!raymarching(ro, rd, info)) {
                 // 衝突しなかったらその時点でのLTE加算をしてbreak
                 LTE += throughput * IBL(rd);
