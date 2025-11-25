@@ -4,6 +4,8 @@
 #define MAT_WALL 2
 #define MAT_METAL 3
 
+#define sat(x) clamp(x,0.,1.)
+
 const float PI = acos(-1.);
 const float TAU = PI * 2.;
 
@@ -244,6 +246,17 @@ float map(vec3 pos, inout SDFInfo info) {
         info.index = (blade < d) ? MAT_METAL : info.index;
         d = min(d, blade);
     }
+
+    /* //////// 
+    BUMP MAP
+    */ ////////
+    if(info.index == MAT_WALL) {
+        // See: https://www.shadertoy.com/view/cltcWM
+        float bump=sat(dot(vec3(0,1,0),smoothstep(.02,.0,abs(fract(pos*1.) - 0.5))))*.01;
+
+        d+=bump;
+    }
+
 
 
     return d;
