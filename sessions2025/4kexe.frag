@@ -1,6 +1,9 @@
 #iChannel0 "self"
 
+// コメントアウトでパストレを有効に
 #define DEBUG
+// Blossomではコメントアウトする
+#define IS_IN_VSCODE
 
 #define MAT_UNDEFINED -1
 #define MAT_FLOOR 0
@@ -339,7 +342,7 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
 
 #define NUM_MAT 4
 const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
-const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5),vec3(0.0),vec3(0.0));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(4.0),vec3(0.0),vec3(0.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -396,7 +399,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // マウスで視点動かせるように
     float mousex = 1.0*iMouse.x/iResolution.x + 0.75;
     float mousey = remap(iMouse.y/iResolution.y, 0.0, 1.0, 1.5, 10.0);
-    ro = vec3(-5.0 * cos(mousex), mousey - 5., -5.0 * sin(mousex));
+    ro = vec3(-5.0 * cos(mousex), mousey - 3., -5.0 * sin(mousex));
     vec3 camPos = ro;
     vec3 ta = vec3(-2, -5, 0);
     ta = vec3(0, -1.0,0 );
@@ -491,16 +494,18 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             }
         }
 
-        // accumulation
-        vec3 prev = vec3(0.0);
-        if (iFrame > 0) {
-            prev = texture(iChannel0, uv).rgb;
-        }
-        float frame = float(iFrame + 1);
-        vec3 accum = (prev * (frame - 1.0) + LTE.rgb) / frame;
-
-        col = accum;
-        // col = LTE;
+        // VSCODE上なら自分でaccumulationする
+        #ifdef IS_IN_VSCODE
+            vec3 prev = vec3(0.0);
+            if (iFrame > 0) {
+                prev = texture(iChannel0, uv).rgb;
+            }
+            float frame = float(iFrame + 1);
+            vec3 accum = (prev * (frame - 1.0) + LTE.rgb) / frame;
+            col = accum;
+        #else
+            col = LTE;
+        #endif
 
     #endif
     // Output to screen
