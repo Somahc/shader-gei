@@ -10,6 +10,7 @@
 #define MAT_LIGHT 1
 #define MAT_WALL 2
 #define MAT_METAL 3
+#define MAT_CEILING_LIGHT 4
 
 #define sat(x) clamp(x,0.,1.)
 
@@ -27,7 +28,7 @@ uint PCGHash()
 
 float rnd1()
 {
-    return float(PCGHash()) / float(0xFFFFFFFFU);    
+    return float(PCGHash()) / float(0xFFFFFFFFU);
 }
 
 vec2 rnd2(){
@@ -153,12 +154,19 @@ float map(vec3 pos, inout SDFInfo info) {
     float tubeWall       = sdBox(pos - vec3(0.0, 0.0, 0.0), vec3(5.0, 5.0, 10.0), 0.0);
     float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(3.5, 4.0, 3.9), 0.0);
     float tubeFarLight   = sdCappedCylinder(pos - vec3(0.0, 0.0, 7.0), 2.0, 2.5);
+    // float ceilingHole = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(1.5, 10.0, 3.9), 0.0);
+    float ceilingLight = sdBox(pos - vec3(0.0, 13.8, -4.0), vec3(10.5, 10.0, 3.9), 0.0);
 
     // Z 軸方向に長い立体 − 外側円柱（トンネルの空間）
     d = max(tubeWall, -tubeOuter);
 
     // 手前側をくり抜いて空間を作る
     d = max(d, -roomFrontInner);
+
+    // 天井に穴開ける
+    // d = max(d, -ceilingHole);
+    info.index = (ceilingLight < d) ? MAT_CEILING_LIGHT : info.index;
+    d = min(d, ceilingLight);
 
     // ライト用の奥の円柱
     info.index = (tubeFarLight < d) ? MAT_LIGHT : info.index;
@@ -340,9 +348,9 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
     info.color = diff;
 }
 
-#define NUM_MAT 4
-const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
-const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5),vec3(0.0),vec3(0.0));
+#define NUM_MAT 5
+const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5),vec3(0.0),vec3(0.0),vec3(1.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -401,8 +409,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     float mousey = remap(iMouse.y/iResolution.y, 0.0, 1.0, 1.5, 10.0);
     ro = vec3(-5.0 * cos(mousex), mousey - 3., -5.0 * sin(mousex));
     vec3 camPos = ro;
-    vec3 ta = vec3(-2, -5, 0);
-    ta = vec3(0, -1.0,0 );
+    vec3 ta = vec3(0.0, -1.0, 0.0);
+    // ta = vec3(0.0,3.0,0.0);
     vec3 fwd = normalize(ta - ro);
     vec3 up = vec3(0, 1, 0);
     vec3 side = normalize(cross(fwd, up));
@@ -479,7 +487,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
 
         // ゴッドレイ・ボリュームレンダリング
-        vec3 lightDir = vec3(0., 0.2, 0.8);
+        vec3 lightDir = vec3(0., 0.1, 0.8);
         float toAdd = 0.15 / float(GODRAY_SAMPLES);
 
         if(length(end) < 1e8) {
