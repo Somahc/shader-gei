@@ -254,7 +254,7 @@ float map(vec3 pos, inout SDFInfo info) {
         d = min(d, blade);
     }
 
-    /* //////// 
+    /* ////////
     BUMP MAP
     */ ////////
     if(info.index == MAT_WALL) {
@@ -342,7 +342,7 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
 
 #define NUM_MAT 4
 const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
-const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(4.0),vec3(0.0),vec3(0.0));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5),vec3(0.0),vec3(0.0));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -501,7 +501,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
                 prev = texture(iChannel0, uv).rgb;
             }
             float frame = float(iFrame + 1);
-            vec3 accum = (prev * (frame - 1.0) + LTE.rgb) / frame;
+            // saturationチェック
+            col = sat(LTE.rgb);
+            // ガンマ補正
+            col = pow(col, vec3(1.0 / 2.2));
+            vec3 accum = (prev * (frame - 1.0) + col.rgb) / frame;
             col = accum;
         #else
             col = LTE;
