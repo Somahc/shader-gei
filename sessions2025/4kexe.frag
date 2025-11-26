@@ -36,6 +36,26 @@ vec2 rnd2(){
     return vec2(rnd1(),rnd1());
 }
 
+float hash(vec2 n)
+{
+    return fract(sin(dot(n, vec2(123.0, 458.0))) * 43758.5453);
+}
+
+float noise (in vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+
 // #define saturate(x) clamp(x, 0.0, 1.0)
 
 // 視点マウス操作用の制限
@@ -136,6 +156,24 @@ float sdStandWithFence(vec3 pos, vec3 standPos) {
     return d;
 }
 
+#define OVTAVES 8
+float fbm (in vec2 p) {
+    float value = 0.;
+    float amplitude = 0.5;
+    float frequency = 0.;
+
+    for (int i = 0; i < OVTAVES; i++) {
+        value += amplitude * noise(p);
+        p *= 2.0;
+        amplitude *= 0.5;
+    }
+    return value;
+}
+
+float distPlane(in vec3 p, vec4 n) {
+    return dot(p, n.xyz) * n.w;
+}
+
 struct RayHitInfo {
     float dist;
     vec3 normal;
@@ -184,6 +222,8 @@ float map(vec3 pos, inout SDFInfo info) {
 
     // 床（手前）
     float floorFrontD = sdBox(pos - vec3(0.0, -3.25, 2.0), vec3(5.0, 0.6, 15.0), 0.0);
+    float h = fbm(pos.xz);
+    floorFrontD -= h * 0.4;
     info.index = (floorFrontD < d) ? MAT_FLOOR : info.index;
     d = min(d, floorFrontD);
 
