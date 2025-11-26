@@ -11,6 +11,7 @@
 #define MAT_WALL 2
 #define MAT_METAL 3
 #define MAT_CEILING_LIGHT 4
+#define MAT_VERTICAL_LIGHT 5
 
 #define sat(x) clamp(x,0.,1.)
 
@@ -151,11 +152,11 @@ float map(vec3 pos, inout SDFInfo info) {
     float d;
     info.index = MAT_WALL;
     float tubeOuter      = sdCappedCylinder(pos + vec3(0.0, 0.0, 0.0), 1.8, 5.0);
-    float tubeWall       = sdBox(pos - vec3(0.0, 0.0, 0.0), vec3(5.0, 5.0, 10.0), 0.0);
-    float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(3.5, 4.0, 3.9), 0.0);
+    float tubeWall       = sdBox(pos - vec3(0.0, 0.0, 0.0), vec3(5.0, 50.0, 10.0), 0.0);
+    float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -6.0), vec3(3.5, 30.0, 5.9), 0.0);
     float tubeFarLight   = sdCappedCylinder(pos - vec3(0.0, 0.0, 7.0), 2.0, 2.5);
-    // float ceilingHole = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(1.5, 10.0, 3.9), 0.0);
-    float ceilingLight = sdBox(pos - vec3(0.0, 13.8, -4.0), vec3(10.5, 10.0, 3.9), 0.0);
+    float ceilingLight = sdBox(pos - vec3(0.0, 25.5, -4.0), vec3(10.5 * 1.1, 8.6, 3.9), 0.0);
+    float verticalFaceLight = sdBox(pos - vec3(0.0,0.0,-10.0), vec3(10.0,10.0,0.1), 0.0);
 
     // Z 軸方向に長い立体 − 外側円柱（トンネルの空間）
     d = max(tubeWall, -tubeOuter);
@@ -163,10 +164,13 @@ float map(vec3 pos, inout SDFInfo info) {
     // 手前側をくり抜いて空間を作る
     d = max(d, -roomFrontInner);
 
-    // 天井に穴開ける
-    // d = max(d, -ceilingHole);
+    // 天井の面光源
     info.index = (ceilingLight < d) ? MAT_CEILING_LIGHT : info.index;
     d = min(d, ceilingLight);
+
+    // ファンの前の面光源
+    info.index = (verticalFaceLight < d) ? MAT_VERTICAL_LIGHT : info.index;
+    d = min(d, verticalFaceLight);
 
     // ライト用の奥の円柱
     info.index = (tubeFarLight < d) ? MAT_LIGHT : info.index;
@@ -179,25 +183,25 @@ float map(vec3 pos, inout SDFInfo info) {
     d = min(d, floorD);
 
     // 床（手前）
-    float floorFrontD = sdBox(pos - vec3(0.0, -3.25, 2.0), vec3(5.0, 0.6, 10.0), 0.0);
+    float floorFrontD = sdBox(pos - vec3(0.0, -3.25, 2.0), vec3(5.0, 0.6, 15.0), 0.0);
     info.index = (floorFrontD < d) ? MAT_FLOOR : info.index;
     d = min(d, floorFrontD);
 
     // 壁の柱 (left)
-    float hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -2.0), vec3(1.0, 10.0, 0.4), 0.0);
+    float hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -2.0), vec3(1.0, 20.0, 0.4), 0.0);
     info.index = (hashiraLeftD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraLeftD);
 
-    hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -5.5), vec3(1.0, 10.0, 0.4), 0.0);
+    hashiraLeftD = sdBox(pos - vec3(-4.3, 0.0, -5.5), vec3(1.0, 20.0, 0.4), 0.0);
     info.index = (hashiraLeftD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraLeftD);
 
     // 壁の柱 (right)
-    float hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -2.0), vec3(1.0, 10.0, 0.4), 0.0);
+    float hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -3.5), vec3(1.0, 20.0, 0.4), 0.0);
     info.index = (hashiraRightD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraRightD);
 
-    hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -5.5), vec3(1.0, 10.0, 0.4), 0.0);
+    hashiraRightD = sdBox(pos - vec3(4.3, 0.0, -7.5), vec3(1.0, 20.0, 0.4), 0.0);
     info.index = (hashiraRightD < d) ? MAT_WALL : info.index;
     d = min(d, hashiraRightD);
 
@@ -252,11 +256,11 @@ float map(vec3 pos, inout SDFInfo info) {
     for(int i=0; i<OBJ_NUM; i++) {
         q.xy *= rot(0.9);
         vec3 qq = q;
-        // qq.xz *= rot(.1 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
+        // qq.xz *= rot(.125 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
 
         // 2Dで形作ってextrude
         float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.35);
-        vec2 w = vec2(blade2D, abs(qq.z) - 0.1);
+        vec2 w = vec2(blade2D, abs(qq.z) - 0.12);
         float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
         info.index = (blade < d) ? MAT_METAL : info.index;
         d = min(d, blade);
@@ -271,8 +275,6 @@ float map(vec3 pos, inout SDFInfo info) {
 
         d+=bump;
     }
-
-
 
     return d;
 }
@@ -342,15 +344,15 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
         vec2 st = vec2(info.position.y, info.position.z); //床だからx,z座標をUVとして渡す
         diff = getConcreteMaterial(info.position, info.rayDist, 0.0);
     };
-    if (sdf_info.index == MAT_METAL) diff = vec3(0,0,0);
+    if (sdf_info.index == MAT_METAL) diff = vec3(0.3922, 0.3922, 0.3922);
     if (sdf_info.index == MAT_LIGHT) diff = vec3(1,1,0);
 
     info.color = diff;
 }
 
-#define NUM_MAT 5
-const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
-const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(0.5),vec3(0.0),vec3(0.0),vec3(1.0));
+#define NUM_MAT 6
+const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(1.0),vec3(0.0),vec3(0.0),vec3(10.0),vec3(0.1));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -407,10 +409,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // マウスで視点動かせるように
     float mousex = 1.0*iMouse.x/iResolution.x + 0.75;
     float mousey = remap(iMouse.y/iResolution.y, 0.0, 1.0, 1.5, 10.0);
-    ro = vec3(-5.0 * cos(mousex), mousey - 3., -5.0 * sin(mousex));
+    ro = vec3(-5.0 * cos(mousex), mousey - 3.5, -5.0 * sin(mousex));
     vec3 camPos = ro;
-    vec3 ta = vec3(0.0, -1.0, 0.0);
-    // ta = vec3(0.0,3.0,0.0);
+    vec3 ta = vec3(0.0, -0.3, -1.5);
+    // ta = vec3(0.0, -0.3, -4.5);
     vec3 fwd = normalize(ta - ro);
     vec3 up = vec3(0, 1, 0);
     vec3 side = normalize(cross(fwd, up));
@@ -488,7 +490,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
         // ゴッドレイ・ボリュームレンダリング
         vec3 lightDir = vec3(0., 0.1, 0.8);
-        float toAdd = 0.15 / float(GODRAY_SAMPLES);
+        float toAdd = 0.005 / float(GODRAY_SAMPLES);
 
         if(length(end) < 1e8) {
             for(int i=0; i<GODRAY_SAMPLES; i++) {
