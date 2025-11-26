@@ -1,3 +1,7 @@
+#iChannel0 "self"
+
+#define DEBUG
+
 #define MAT_UNDEFINED -1
 #define MAT_FLOOR 0
 #define MAT_LIGHT 1
@@ -71,7 +75,7 @@ vec3 cosineSampling(vec2 uv,inout float pdf){
 }
 
 vec3 IBL(vec3 dir){
-    return vec3(0.0);
+    return vec3(4.0);
 }
 
 mat2 rot(float a) {
@@ -372,7 +376,7 @@ bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
 #define GODRAY_SAMPLES 8 // ゴッドレイのサンプル数
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    const bool DEBUG = true;
+    // const bool DEBUG = true;
     const bool DEBUG_NORMAL = false;
 
     seed = uint(uint(iFrame+1) * uint(fragCoord.x + iResolution.x * fragCoord.y));
@@ -409,7 +413,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 col = vec3(0.);
 
     // デバッグ用
-    if(DEBUG) {
+    #ifdef DEBUG
         SurfaceInfo info;
         if (raymarching(ro, rd, info)) {
             col = info.color * (max(dot(info.normal,LIGHT_DIR),0.0) + 0.2);
@@ -417,8 +421,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         } else {
             col = vec3(0.0);
         }
-    } else {
-
+    #else
+        // パストレーシング
         vec3 end = vec3(1e9);
         for(int b=0; b<MAX_DEPTH; b++) {
             SurfaceInfo info;
@@ -428,7 +432,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
                 break;
             }
             throughput /= russian_p;
-            
+
             if(!raymarching(ro, rd, info)) {
                 // 衝突しなかったらその時点でのLTE加算をしてbreak
                 LTE += throughput * IBL(rd);
@@ -446,7 +450,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             }
 
             // 衝突時
-            
+
             vec3 tangent, binormal;
             tangentSpaceBasis(info.normal, tangent, binormal);
             vec3 normal = info.normal;
@@ -486,10 +490,19 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
                 }
             }
         }
-        
-        col = LTE;
 
-    }
+        // accumulation
+        vec3 prev = vec3(0.0);
+        if (iFrame > 0) {
+            prev = texture(iChannel0, uv).rgb;
+        }
+        float frame = float(iFrame + 1);
+        vec3 accum = (prev * (frame - 1.0) + LTE.rgb) / frame;
+
+        col = accum;
+        // col = LTE;
+
+    #endif
     // Output to screen
     fragColor = vec4(col, 1.0);
 }
