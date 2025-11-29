@@ -189,10 +189,10 @@ struct SDFInfo {
 float map(vec3 pos, inout SDFInfo info) {
     float d;
     info.index = MAT_WALL;
-    float tubeOuter      = sdCappedCylinder(pos + vec3(0.0, 0.0, 0.0), 1.8, 5.0);
-    float tubeWall       = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(5.0, 50.0, 10.0), 0.0);
+    float tubeOuter      = sdCappedCylinder(pos + vec3(0.0, 0.0, 0.0), 1.9, 7.5);
+    float tubeWall       = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(5.0, 50.0, 13.0), 0.0);
     float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -6.0), vec3(3.5, 30.0, 5.9), 0.0);
-    float tubeFarLight   = sdCappedCylinder(pos - vec3(0.0, 0.0, 7.0), 2.0, 2.5);
+    float tubeFarLight   = sdCappedCylinder(pos - vec3(0.0, 0.0, 9.85), 2.0, 2.5);
     float ceilingLight = sdBox(pos - vec3(0.0, 27.0, -4.0), vec3(10.5 * 1.1, 8.6, 3.9), 0.0);
     float verticalFaceLight = sdBox(pos - vec3(0.0,0.0,-11.9), vec3(10.0,10.0,0.1), 0.0);
 
@@ -384,7 +384,7 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
         vec2 st = vec2(info.position.y, info.position.z); //床だからx,z座標をUVとして渡す
         diff = getConcreteMaterial(info.position, info.rayDist, 0.0);
     };
-    if (sdf_info.index == MAT_METAL) diff = vec3(0.3922, 0.3922, 0.3922);
+    if (sdf_info.index == MAT_METAL) diff = vec3(0.4941, 0.4941, 0.4941);
     if (sdf_info.index == MAT_LIGHT) diff = vec3(1,1,0);
     if (sdf_info.index == MAT_CEILING_LIGHT) diff = vec3(1,1,0);
     if (sdf_info.index == MAT_VERTICAL_LIGHT) diff = vec3(1,1,0);
@@ -394,7 +394,7 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
 
 #define NUM_MAT 6
 const vec3 color[NUM_MAT] = vec3[NUM_MAT](vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0),vec3(1.0));
-const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(1.0),vec3(0.0),vec3(0.0),vec3(10.0),vec3(0.1));
+const vec3 emission[NUM_MAT] = vec3[NUM_MAT](vec3(0.0),vec3(5.5),vec3(0.0),vec3(0.0),vec3(20.0),vec3(0.3));
 
 #define MAX_STEP 300
 bool raymarching(vec3 ro, vec3 rd, inout SurfaceInfo info) {
@@ -527,7 +527,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
         // ゴッドレイ・ボリュームレンダリング
         vec3 lightDir = vec3(0., 0.1, 0.8);
-        float toAdd = 0.005 / float(GODRAY_SAMPLES);
+        float toAdd = 0.001 / float(GODRAY_SAMPLES);
 
         if(length(end) < 1e8) {
             for(int i=0; i<GODRAY_SAMPLES; i++) {
