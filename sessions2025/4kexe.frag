@@ -190,11 +190,11 @@ float map(vec3 pos, inout SDFInfo info) {
     float d;
     info.index = MAT_WALL;
     float tubeOuter      = sdCappedCylinder(pos + vec3(0.0, 0.0, 0.0), 1.8, 5.0);
-    float tubeWall       = sdBox(pos - vec3(0.0, 0.0, 0.0), vec3(5.0, 50.0, 10.0), 0.0);
+    float tubeWall       = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(5.0, 50.0, 10.0), 0.0);
     float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -6.0), vec3(3.5, 30.0, 5.9), 0.0);
     float tubeFarLight   = sdCappedCylinder(pos - vec3(0.0, 0.0, 7.0), 2.0, 2.5);
-    float ceilingLight = sdBox(pos - vec3(0.0, 25.5, -4.0), vec3(10.5 * 1.1, 8.6, 3.9), 0.0);
-    float verticalFaceLight = sdBox(pos - vec3(0.0,0.0,-10.0), vec3(10.0,10.0,0.1), 0.0);
+    float ceilingLight = sdBox(pos - vec3(0.0, 27.0, -4.0), vec3(10.5 * 1.1, 8.6, 3.9), 0.0);
+    float verticalFaceLight = sdBox(pos - vec3(0.0,0.0,-11.9), vec3(10.0,10.0,0.1), 0.0);
 
     // Z 軸方向に長い立体 − 外側円柱（トンネルの空間）
     d = max(tubeWall, -tubeOuter);
@@ -296,11 +296,11 @@ float map(vec3 pos, inout SDFInfo info) {
     for(int i=0; i<OBJ_NUM; i++) {
         q.xy *= rot(0.9);
         vec3 qq = q;
-        // qq.xz *= rot(.125 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
+        qq.xz *= rot(.125 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
 
         // 2Dで形作ってextrude
         float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.35);
-        vec2 w = vec2(blade2D, abs(qq.z) - 0.12);
+        vec2 w = vec2(blade2D, abs(qq.z) - 0.17);
         float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
         info.index = (blade < d) ? MAT_METAL : info.index;
         d = min(d, blade);
@@ -386,6 +386,8 @@ void materialize(inout SurfaceInfo info, in SDFInfo sdf_info) {
     };
     if (sdf_info.index == MAT_METAL) diff = vec3(0.3922, 0.3922, 0.3922);
     if (sdf_info.index == MAT_LIGHT) diff = vec3(1,1,0);
+    if (sdf_info.index == MAT_CEILING_LIGHT) diff = vec3(1,1,0);
+    if (sdf_info.index == MAT_VERTICAL_LIGHT) diff = vec3(1,1,0);
 
     info.color = diff;
 }
@@ -440,24 +442,19 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec2 p = suv;
     
-    vec3 ro = vec3(-1,-1.3,-3.8);
-    // fanにちかづく
-    // ro = vec3(-1,-1.3,-1.5);
-
-    // ro = vec3(1,-2.3,-0.8);
-
     // マウスで視点動かせるように
     float mousex = 1.0*iMouse.x/iResolution.x + 0.75;
     float mousey = remap(iMouse.y/iResolution.y, 0.0, 1.0, 1.5, 10.0);
-    ro = vec3(-5.0 * cos(mousex), mousey - 3.5, -5.0 * sin(mousex));
+    vec3 ro = vec3(-5.0 * cos(mousex), mousey - 3.5, -5.0 * sin(mousex));
+    ro = vec3(-3.45, -1.9, -4.2);
     vec3 camPos = ro;
-    vec3 ta = vec3(0.0, -0.3, -1.5);
-    // ta = vec3(0.0, -0.3, -4.5);
+    vec3 ta = vec3(1.0, 0.25, -2.0);
+    // ta = vec3(1.0, 0.25, -5.0);
     vec3 fwd = normalize(ta - ro);
     vec3 up = vec3(0, 1, 0);
     vec3 side = normalize(cross(fwd, up));
     up = normalize(cross(side ,fwd));
-    float fov = 1.;
+    float fov = 1.05;
     vec3 rd = normalize(p.x * side + p.y * up + fwd * fov);
 
     vec3 LTE = vec3(0.0); // 最終結果
