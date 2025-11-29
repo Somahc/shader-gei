@@ -193,7 +193,7 @@ float map(vec3 pos, inout SDFInfo info) {
     float tubeWall       = sdBox(pos - vec3(0.0, 0.0, -4.0), vec3(5.0, 50.0, 13.0), 0.0);
     float roomFrontInner = sdBox(pos - vec3(0.0, 0.0, -6.0), vec3(3.5, 30.0, 5.9), 0.0);
     float tubeFarLight   = sdCappedCylinder(pos - vec3(0.0, 0.0, 9.85), 2.0, 2.5);
-    float ceilingLight = sdBox(pos - vec3(0.0, 27.0, -4.0), vec3(10.5 * 1.1, 8.6, 3.9), 0.0);
+    float ceilingLight = sdBox(pos - vec3(0.0, 30.5, -4.0), vec3(10.5 * 1.1, 8.6, 3.9), 0.0);
     float verticalFaceLight = sdBox(pos - vec3(0.0,0.0,-11.9), vec3(10.0,10.0,0.1), 0.0);
 
     // Z 軸方向に長い立体 − 外側円柱（トンネルの空間）
@@ -446,9 +446,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     float mousex = 1.0*iMouse.x/iResolution.x + 0.75;
     float mousey = remap(iMouse.y/iResolution.y, 0.0, 1.0, 1.5, 10.0);
     vec3 ro = vec3(-5.0 * cos(mousex), mousey - 3.5, -5.0 * sin(mousex));
-    ro = vec3(-3.45, -1.9, -4.2);
+    ro = vec3(-3.45, -2.45, -4.2);
     vec3 camPos = ro;
-    vec3 ta = vec3(1.0, 0.25, -2.0);
+    vec3 ta = vec3(1.0, 0.25, -1.8);
     // ta = vec3(1.0, 0.25, -5.0);
     vec3 fwd = normalize(ta - ro);
     vec3 up = vec3(0, 1, 0);
