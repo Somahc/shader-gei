@@ -156,7 +156,7 @@ float sdStandWithFence(vec3 pos, vec3 standPos) {
     return d;
 }
 
-#define OVTAVES 8
+#define OVTAVES 5
 float fbm (in vec2 p) {
     float value = 0.;
     float amplitude = 0.5;
@@ -291,20 +291,32 @@ float map(vec3 pos, inout SDFInfo info) {
 
     q -= vec3(0., 0., .7); // ファンの位置
 
-    q.xy *= rot(0.18); // ちょっとbladeたちを回しとく
+    // q.xy *= rot(0.18); // ちょっとbladeたちを回しとく
 
-    for(int i=0; i<OBJ_NUM; i++) {
-        q.xy *= rot(0.9);
-        vec3 qq = q;
-        qq.xz *= rot(.125 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
+    // ↓pmod使ったほうが軽そうなのでコメントアウト
+    // for(int i=0; i<OBJ_NUM; i++) {
+    //     q.xy *= rot(0.9);
+    //     vec3 qq = q;
+    //     qq.xz *= rot(.125 * TAU); // bladeをひねらせる(これやるとshadowの計算おかしくなるので一旦やめ)
 
-        // 2Dで形作ってextrude
-        float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.35);
-        vec2 w = vec2(blade2D, abs(qq.z) - 0.17);
-        float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
-        info.index = (blade < d) ? MAT_METAL : info.index;
-        d = min(d, blade);
-    }
+    //     // 2Dで形作ってextrude
+    //     float blade2D = sdUnevenCapsule(qq.xy, .03, .35, 1.35);
+    //     vec2 w = vec2(blade2D, abs(qq.z) - 0.17);
+    //     float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
+    //     info.index = (blade < d) ? MAT_METAL : info.index;
+    //     d = min(d, blade);
+    // }
+
+    q.xy = pmod(q.xy, float(OBJ_NUM));
+    q.xz *= rot(.125 * TAU);
+
+    q.xy *= rot(-0.06); // bladeに法線Artifact出ないよう微回転
+    // 2Dで形作ってextrude
+    float blade2D = sdUnevenCapsule(q.xy, .03, .35, 1.35);
+    vec2 w = vec2(blade2D, abs(q.z) - 0.17);
+    float blade = min(max(w.x,w.y),0.0) + length(max(w,0.0));
+    info.index = (blade < d) ? MAT_METAL : info.index;
+    d = min(d, blade);
 
     /* ////////
     BUMP MAP
@@ -448,13 +460,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 ro = vec3(-5.0 * cos(mousex), mousey - 3.5, -5.0 * sin(mousex));
     ro = vec3(-3.45, -2.45, -4.2);
     vec3 camPos = ro;
-    vec3 ta = vec3(1.0, 0.25, -1.8);
+    vec3 ta = vec3(1.0, 0.18, -1.8);
     // ta = vec3(1.0, 0.25, -5.0);
     vec3 fwd = normalize(ta - ro);
     vec3 up = vec3(0, 1, 0);
     vec3 side = normalize(cross(fwd, up));
     up = normalize(cross(side ,fwd));
-    float fov = 1.05;
+    float fov = 1.1;
     vec3 rd = normalize(p.x * side + p.y * up + fwd * fov);
 
     vec3 LTE = vec3(0.0); // 最終結果
